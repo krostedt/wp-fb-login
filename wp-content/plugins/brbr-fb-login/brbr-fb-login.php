@@ -49,6 +49,25 @@ class brbrFacebookLogin {
     private $callback_url;
 
     /**
+    * Access token from Facebook
+    *
+    * @var string
+    */
+   private $access_token;
+
+   /**
+     * Where we redirect our user after the process
+     *
+     * @var string
+     */
+    private $redirect_url;
+
+    /**
+     * User details from the API
+     */
+    private $facebook_details;
+
+    /**
      * constructor
      */
     public function __construct() {
@@ -63,9 +82,9 @@ class brbrFacebookLogin {
         
 
         add_action('init', array( $this, 'start_session' ), 1);
-
-        // We register our shortcode
         add_shortcode( 'brbr_facebook_login', array($this, 'generate_shortcode') );
+        add_action( 'wp_ajax_brbr_facebook', array($this, 'api_callback'));
+        add_action( 'wp_ajax_nopriv_brbr_facebook', array($this, 'api_callback'));
  
     }
 
@@ -79,6 +98,11 @@ class brbrFacebookLogin {
         if ( is_user_logged_in() ) {
             return;
         }
+
+        // We save the URL for the redirection:
+        if ( !isset($_SESSION['brbr_facebook_url']) ) {
+            $_SESSION['brbr_facebook_url'] = '//' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];            
+        }
  
         /* Different labels according to whether the user is allowed to 
         register or not*/
@@ -90,7 +114,16 @@ class brbrFacebookLogin {
         
         // Button markup
         $html = '<div id="brbr-facebook-wrapper">';
-        $html .= '<a href="' . $this->get_login_url() . '" id="brbr-facebook-button">'.$button_label.'</a>';
+
+        // Messages
+        if(isset($_SESSION['brbr_facebook_message'])) {
+            $message = $_SESSION['brbr_facebook_message'];
+            $html .= '<div id="brbr-facebook-message" class="alert alert-danger">' . $message . '</div>';
+            // We remove them from the session
+            unset($_SESSION['brbr_facebook_message']);
+        }
+
+        $html .= '<a href="' . $this->get_login_url() . '" id="brbr-facebook-button">' . $button_label . '</a>';
         $html .= '</div>';
         
         return $html;
@@ -133,12 +166,166 @@ class brbrFacebookLogin {
         return esc_url($url);
         
     }
+
+    private function get_token() {
+
+        // Assign the Session variable for Facebook
+        $_SESSION['FBRLH_state'] = $_GET['state'];
+
+        // Load the Facebook SDK helper
+        $helper = $fb->getRedirectLoginHelper();
+
+        // Try to get an access token
+        try {
+            $access_token = $helper->getAccessToken();
+        }
+        // When Graph returns an error
+        catch(FacebookResponseException $e) {
+            $error = __('Graph returned an error: ', 'brbr') . $e->getMessage();
+            $message = array(
+                'type' => 'error',
+                'content' => $error
+            );
+        }
+
+        // When validation fails or other local issues
+        catch(FacebookSDKException $e) {
+            $error = __('Facebook SDK returned an error: ', 'brbr') . $e->getMessage();
+            $message = array(
+                'type' => 'error',
+                'content' => $error
+            );
+        }
+
+        // if token wasn't obtained, set an error message
+        if ( !isset($access_token) ) {
+            // Report our errors
+            $_SESSION['brbr_facebook_message'] = $message;
+            // Redirect
+            header("Location: ".$this->redirect_url, true);
+            die();
+        }
+ 
+        return $access_token->getValue();
+
+    }
+
+    private function get_user_details() {
+
+        try {
+            $response = $fb->get('/me?fields=id,name,first_name,last_name,email,link', $this->access_token);
+        } catch(FacebookResponseException $e) {
+            $message = __('Graph returned an error: ', 'brbr') . $e->getMessage();
+            $message = array(
+                'type' => 'error',
+                'content' => $error
+            );
+        } catch(FacebookSDKException $e) {
+            $message = __('Facebook SDK returned an error: ', 'brbr') . $e->getMessage();
+            $message = array(
+                'type' => 'error',
+                'content' => $error
+            );
+        }
+
+        if ( isset($message) ) {
+            // Report our errors
+            $_SESSION['alka_facebook_message'] = $message;
+            // Redirect
+            header("Location: ".$this->redirect_url, true);
+            die();
+        }
+ 
+        return $response->getGraphUser();
+
+    }
+
+    private function login_user() {
+
+        // We look for the `eo_facebook_id` to see if there is any match
+        $wp_users = get_users(array(
+            'meta_key'     => 'brbr_facebook_id',
+            'meta_value'   => $this->facebook_details['id'],
+            'number'       => 1,
+            'count_total'  => false,
+            'fields'       => 'id',
+        ));
     
+        if( empty($wp_users[0]) ) {
+            return false;
+        }
+    
+        // Log the user ?
+        wp_set_auth_cookie( $wp_users[0] );
+
+    }
+
+    private function create_user() {
+
+        $fb_user = $this->facebook_details;
+        
+        // Create an username
+        $username = sanitize_user(str_replace(' ', '_', strtolower($this->facebook_details['name'])));
+        
+        // Creating our user
+        $new_user = wp_create_user($username, wp_generate_password(), $fb_user['email']);
+        
+        if(is_wp_error($new_user)) {
+            // Report our errors
+            $_SESSION['alka_facebook_message'] = $new_user->get_error_message();
+            // Redirect
+            header("Location: ".$this->redirect_url, true);
+            die();
+        }
+        
+        // Setting the meta
+        update_user_meta( $new_user, 'first_name', $fb_user['first_name'] );
+        update_user_meta( $new_user, 'last_name', $fb_user['last_name'] );
+        update_user_meta( $new_user, 'user_url', $fb_user['link'] );
+        update_user_meta( $new_user, 'brbr_facebook_id', $fb_user['id'] );
+    
+        // Log the user ?
+        wp_set_auth_cookie( $new_user );
+
+    }
+    
+    /**
+     * initiate a session if not already active
+     */
     public function start_session() {
 
         if ( !session_id() ) {
             session_start();
         }
+
+    }
+
+    /**
+     * ajax api callback
+     */
+    public function api_callback() {
+
+        start_session();
+
+        // Set the Redirect URL:
+        $this->redirect_url = isset($_SESSION['brbr_facebook_url']) ? $_SESSION['brbr_facebook_url'] : home_url();
+        $fb = $this->init_api();
+
+        // We save the token in our instance
+        $this->access_token = $this->get_token($fb);
+
+        // We get the user details
+        $this->facebook_details = $this->get_user_details($fb);
+
+        // We first try to login the user
+        $this->login_user();
+
+        // Otherwise, we create a new account
+        $this->create_user();
+
+        // Redirect the user
+        header("Location: ".$this->redirect_url, true);
+        die();
 
     }
 
