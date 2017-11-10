@@ -61,23 +61,25 @@ class brbrFacebookLogin {
 
         $this->callback_url = admin_url('admin-ajax.php') . '?action=brbr_facebook_login';
         
+
+        add_action('init', array( $this, 'start_session' ), 1);
+
         // We register our shortcode
-        add_shortcode( 'brbr_facebook_login', array($this, 'generateShortcode') );
+        add_shortcode( 'brbr_facebook_login', array($this, 'generate_shortcode') );
  
     }
 
     /**
-     * Render the shortcode [alka_facebook/]
+     * Render the shortcode [brbr_facebook_login/]
      *
      * It displays our Login / Register button
      */
-    public function generateShortcode() {
-        
-        // No need for the button is the user is already logged
-        if ( is_user_logged_in()) {
+    public function generate_shortcode() {
+
+        if ( is_user_logged_in() ) {
             return;
         }
-            
+ 
         /* Different labels according to whether the user is allowed to 
         register or not*/
         if (get_option( 'users_can_register' )) {
@@ -88,7 +90,7 @@ class brbrFacebookLogin {
         
         // Button markup
         $html = '<div id="brbr-facebook-wrapper">';
-        $html .= '<a href="#" id="brbr-facebook-button">'.$button_label.'</a>';
+        $html .= '<a href="' . $this->get_login_url() . '" id="brbr-facebook-button">'.$button_label.'</a>';
         $html .= '</div>';
         
         return $html;
@@ -112,10 +114,35 @@ class brbrFacebookLogin {
        return $facebook;
     
    }
+
+   /*
+    * Login URL to Facebook API
+    *
+    * @return string
+    */
+    private function get_login_url() {
+        
+        $fb = $this->init_fb_api();
+        $helper = $fb->getRedirectLoginHelper();
+        
+        // Optional permissions
+        $permissions = ['email'];
+        
+        $url = $helper->getLoginUrl($this->callback_url, $permissions);
+        
+        return esc_url($url);
+        
+    }
+    
+    public function start_session() {
+
+        if ( !session_id() ) {
+            session_start();
+        }
+
+    }
+
     
 }
  
-/*
- * Starts our plugins, easy!
- */
 new brbrFacebookLogin();
