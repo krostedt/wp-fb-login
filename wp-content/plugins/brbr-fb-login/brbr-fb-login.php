@@ -23,6 +23,7 @@ require_once __DIR__ . '/vendor/autoload.php'; // change path as needed
 use Facebook\Facebook;
 use Facebook\Exceptions\FacebookSDKException;
 use Facebook\Exceptions\FacebookResponseException;
+use Dotenv\Dotenv;
 
 class brbrFacebookLogin {
 
@@ -31,14 +32,14 @@ class brbrFacebookLogin {
      *
      * @var string
      */
-    private $app_id = 'xxxxxxxxxxxx';
+    private $app_id;
     
     /**
     * Facebook APP Secret
     *
     * @var string
     */
-    private $app_secret = 'yyyyyyyyyyyyy';
+    private $app_secret;
     
     /**
     * Callback URL used by the API
@@ -52,7 +53,13 @@ class brbrFacebookLogin {
      */
     public function __construct() {
 
-        $callback_url = admin_url('admin-ajax.php') . '?action=brbr_facebook_login';
+        $dotenv = new Dotenv(__DIR__);
+        $dotenv->load();
+
+        $this->app_id = getenv('APP_ID');
+        $this->app_secret = getenv('APP_SECRET');
+
+        $this->callback_url = admin_url('admin-ajax.php') . '?action=brbr_facebook_login';
         
         // We register our shortcode
         add_shortcode( 'brbr_facebook_login', array($this, 'generateShortcode') );
@@ -87,6 +94,24 @@ class brbrFacebookLogin {
         return $html;
         
     }
+
+    /*
+    * Init the API Connection
+    *
+    * @return Facebook
+    */
+   private function init_fb_api() {
+    
+       $facebook = new Facebook([
+           'app_id' => $this->app_id,
+           'app_secret' => $this->app_secret,
+           'default_graph_version' => 'v2.10',
+           'persistent_data_handler' => 'session'
+       ]);
+    
+       return $facebook;
+    
+   }
     
 }
  
@@ -94,5 +119,3 @@ class brbrFacebookLogin {
  * Starts our plugins, easy!
  */
 new brbrFacebookLogin();
-
-var_dump( admin_url() );
