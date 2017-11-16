@@ -80,11 +80,10 @@ class brbrFacebookLogin {
 
         $this->callback_url = admin_url('admin-ajax.php') . '?action=brbr_facebook_login';
         
-
         add_action('init', array( $this, 'start_session' ), 1);
         add_shortcode( 'brbr_facebook_login', array($this, 'generate_shortcode') );
-        add_action( 'wp_ajax_brbr_facebook', array($this, 'api_callback'));
-        add_action( 'wp_ajax_nopriv_brbr_facebook', array($this, 'api_callback'));
+        add_action( 'wp_ajax_brbr_facebook_login', array($this, 'api_callback'));
+        add_action( 'wp_ajax_nopriv_brbr_facebook_login', array($this, 'api_callback'));
  
     }
 
@@ -118,7 +117,16 @@ class brbrFacebookLogin {
         // Messages
         if(isset($_SESSION['brbr_facebook_message'])) {
             $message = $_SESSION['brbr_facebook_message'];
-            $html .= '<div id="brbr-facebook-message" class="alert alert-danger">' . $message . '</div>';
+            $html .= '<div id="brbr-facebook-message" class="alert alert-danger">'; 
+            if (is_array($message)) {
+                foreach ($message as $item) {
+                    $html .= $item;
+                } 
+            } else {
+                $html .= $message;
+            }
+            $html .= '</div>';
+
             // We remove them from the session
             unset($_SESSION['brbr_facebook_message']);
         }
@@ -172,6 +180,8 @@ class brbrFacebookLogin {
         // Assign the Session variable for Facebook
         $_SESSION['FBRLH_state'] = $_GET['state'];
 
+        $fb = $this->init_fb_api();
+
         // Load the Facebook SDK helper
         $helper = $fb->getRedirectLoginHelper();
 
@@ -205,6 +215,8 @@ class brbrFacebookLogin {
             header("Location: ".$this->redirect_url, true);
             die();
         }
+
+
  
         return $access_token->getValue();
 
@@ -212,6 +224,7 @@ class brbrFacebookLogin {
 
     private function get_user_details() {
 
+        $fb = $this->init_fb_api();
         try {
             $response = $fb->get('/me?fields=id,name,first_name,last_name,email,link', $this->access_token);
         } catch(FacebookResponseException $e) {
@@ -230,7 +243,7 @@ class brbrFacebookLogin {
 
         if ( isset($message) ) {
             // Report our errors
-            $_SESSION['alka_facebook_message'] = $message;
+            $_SESSION['brbr_facebook_message'] = $message;
             // Redirect
             header("Location: ".$this->redirect_url, true);
             die();
@@ -272,7 +285,7 @@ class brbrFacebookLogin {
         
         if(is_wp_error($new_user)) {
             // Report our errors
-            $_SESSION['alka_facebook_message'] = $new_user->get_error_message();
+            $_SESSION['brbr_facebook_message'] = $new_user->get_error_message();
             // Redirect
             header("Location: ".$this->redirect_url, true);
             die();
@@ -305,11 +318,9 @@ class brbrFacebookLogin {
      */
     public function api_callback() {
 
-        start_session();
-
         // Set the Redirect URL:
         $this->redirect_url = isset($_SESSION['brbr_facebook_url']) ? $_SESSION['brbr_facebook_url'] : home_url();
-        $fb = $this->init_api();
+        $fb = $this->init_fb_api();
 
         // We save the token in our instance
         $this->access_token = $this->get_token($fb);
