@@ -278,12 +278,19 @@ class brbrFacebookLogin {
         $fb_user = $this->facebook_details;
         
         // Create an username
-        $username = sanitize_user(str_replace(' ', '_', strtolower($this->facebook_details['name'])));
+        $user_name = sanitize_user(str_replace(' ', '_', strtolower($this->facebook_details['name'])));
         
         // Creating our user
-        $new_user = wp_create_user($username, wp_generate_password(), $fb_user['email']);
+        $new_user = wp_insert_user([
+            'user_login'  => $user_name,
+            'user_email'  => $fb_user['email'],
+            'first_name'  => $fb_user['first_name'],
+            'last_name'   => $fb_user['last_name'],
+            'user_url'    => $fb_user['link'],
+            'user_pass'   => wp_generate_password()
+        ]);
         
-        if(is_wp_error($new_user)) {
+        if (is_wp_error($new_user)) {
             // Report our errors
             $_SESSION['brbr_facebook_message'] = $new_user->get_error_message();
             // Redirect
@@ -292,9 +299,6 @@ class brbrFacebookLogin {
         }
         
         // Setting the meta
-        update_user_meta( $new_user, 'first_name', $fb_user['first_name'] );
-        update_user_meta( $new_user, 'last_name', $fb_user['last_name'] );
-        update_user_meta( $new_user, 'user_url', $fb_user['link'] );
         update_user_meta( $new_user, 'brbr_facebook_id', $fb_user['id'] );
     
         // Log the user ?
