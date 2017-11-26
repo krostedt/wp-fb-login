@@ -255,7 +255,7 @@ class brbrFacebookLogin {
 
     private function login_user() {
 
-        // We look for the `eo_facebook_id` to see if there is any match
+        // We look for the `facebook_id` to see if there is any match
         $wp_users = get_users(array(
             'meta_key'     => 'brbr_facebook_id',
             'meta_value'   => $this->facebook_details['id'],
@@ -270,6 +270,8 @@ class brbrFacebookLogin {
     
         // Log the user ?
         wp_set_auth_cookie( $wp_users[0] );
+
+        return true;
 
     }
 
@@ -333,10 +335,12 @@ class brbrFacebookLogin {
         $this->facebook_details = $this->get_user_details($fb);
 
         // We first try to login the user
-        $this->login_user();
+        if ( !$this->login_user() ) {
 
-        // Otherwise, we create a new account
-        $this->create_user();
+            // Otherwise, we create a new account
+            $this->create_user();
+
+        }
 
         // Redirect the user
         header("Location: ".$this->redirect_url, true);
