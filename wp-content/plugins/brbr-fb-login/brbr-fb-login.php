@@ -343,8 +343,8 @@ class brbrFacebookLogin {
         }
 
         // Redirect the user
-        header("Location: ".$this->redirect_url, true);
-        die();
+        wp_redirect( $$this->redirect_urlurl );
+        exit;
 
     }
 
