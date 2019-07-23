@@ -6,10 +6,10 @@
   "license": "MIT",
   "dependencies": {
     "grunt": "^1.0.1",
-    "grunt-concurrent": "^2.3.1",
-    "grunt-sass": "^2.0.0",
+    "grunt-concurrent": "^3.0.0",
+    "grunt-sass": "^3.0.0",
     "grunt-version-check": "^0.3.8",
     "jit-grunt": "^0.10.0",
-    "time-grunt": "^1.4.0"
+    "time-grunt": "^2.0.0"
   }
 }
