@@ -5,7 +5,7 @@
   "author": "krostedt <rostedt@rostech.org>",
   "license": "MIT",
   "dependencies": {
-    "grunt": "^1.0.1",
+    "grunt": "^1.5.3",
     "grunt-concurrent": "^3.0.0",
     "grunt-sass": "^3.0.0",
     "jit-grunt": "^0.10.0",
